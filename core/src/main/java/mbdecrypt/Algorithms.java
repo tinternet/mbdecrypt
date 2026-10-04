@@ -1,5 +1,6 @@
 package mbdecrypt;
 
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Locale;
@@ -110,15 +111,8 @@ final class Algorithms {
     }
 
     private static byte[] trim(byte[] bytes) {
-        int start = 0;
-        int end = bytes.length;
-        while (start < end && (bytes[start] & 0xff) <= ' ') {
-            start++;
-        }
-        while (end > start && (bytes[end - 1] & 0xff) <= ' ') {
-            end--;
-        }
-        return Arrays.copyOfRange(bytes, start, end);
+        // ISO-8859-1 maps each byte to one char, so arbitrary plaintext survives the round trip
+        return new String(bytes, StandardCharsets.ISO_8859_1).trim().getBytes(StandardCharsets.ISO_8859_1);
     }
 
     private static byte[] stripZeros(byte[] bytes) {
