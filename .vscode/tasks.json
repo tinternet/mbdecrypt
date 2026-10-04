@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "deploy plugin",
+      "type": "shell",
+      "command": "./dev/deploy.sh",
+      "problemMatcher": []
+    }
+  ]
+}

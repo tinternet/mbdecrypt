@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Debug plugin in Metabase",
+      "request": "attach",
+      "projectName": "mbdecrypt-core",
+      "hostName": "mbdecrypt-metabase",
+      "port": 5005
+    }
+  ]
+}
