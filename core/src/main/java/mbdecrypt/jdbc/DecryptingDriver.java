@@ -24,14 +24,6 @@ public final class DecryptingDriver implements Driver {
     public static final String ENCRYPTION_RULES_CONFIG = "decrypt-rules";
     public static final String DECRYPTORS_CONFIG = "decrypt-decryptors";
 
-    static {
-        try {
-            DriverManager.registerDriver(new DecryptingDriver());
-        } catch (SQLException e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
-
     @Override
     public boolean acceptsURL(String url) {
         return url != null && url.startsWith(URL_PREFIX);

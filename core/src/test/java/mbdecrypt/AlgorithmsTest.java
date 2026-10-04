@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import javax.crypto.AEADBadTagException;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,14 @@ class AlgorithmsTest {
     void aesCbc() throws Exception {
         assertEquals("4111111111111111",
                 decrypt(create("aes-128-cbc", CARDS_KEY), Fixtures.cbc(CARDS_KEY, "4111111111111111")));
+        assertEquals("4111111111111111", decrypt(Algorithms.create("aes-cbc", CARDS_KEY, null, "pkcs7"),
+                Fixtures.cbc(CARDS_KEY, "4111111111111111")));
+    }
+
+    @Test
+    void aes192() throws Exception {
+        byte[] key = Arrays.copyOf(PII_KEY, 24);
+        assertEquals("123-45-6789", decrypt(create("aes-192-gcm", key), Fixtures.gcm(key, "123-45-6789")));
     }
 
     @Test
@@ -73,6 +82,8 @@ class AlgorithmsTest {
     @Test
     void shortValuesFailCleanly() {
         assertThrows(GeneralSecurityException.class, () -> create("aes-gcm", PII_KEY).decrypt(new byte[5]));
+        assertThrows(GeneralSecurityException.class,
+                () -> Algorithms.create("aes-gcm", PII_KEY, FIXED_IV, null).decrypt(new byte[5]));
         assertThrows(GeneralSecurityException.class, () -> create("aes-cbc", PII_KEY).decrypt(new byte[16]));
         assertThrows(GeneralSecurityException.class,
                 () -> Algorithms.create("aes-cbc", PII_KEY, FIXED_IV, null).decrypt(new byte[5]));

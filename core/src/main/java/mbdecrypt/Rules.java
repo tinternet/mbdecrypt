@@ -62,7 +62,7 @@ public final class Rules {
         }
 
         for (Element rule : elements) {
-            if (rule == null || rule.pattern() == null || rule.decryptor() == null) {
+            if (rule.pattern() == null || rule.decryptor() == null) {
                 throw new IllegalArgumentException("every rule needs a pattern and a decryptor: " + rule);
             }
         }

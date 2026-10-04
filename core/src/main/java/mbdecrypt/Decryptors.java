@@ -47,7 +47,7 @@ public final class Decryptors {
             }
         }
 
-        if (elements == null || elements.isEmpty()) {
+        if (elements == null) {
             throw new IllegalArgumentException("no decryptors are configured; add them to the connection settings, "
                     + "under Decryptors, as <decryptor name=\"…\" algorithm=\"…\" key=\"<hex>\"/>");
         }
@@ -55,7 +55,7 @@ public final class Decryptors {
         Map<String, Decryptor> decryptors = new LinkedHashMap<>();
         for (int i = 0; i < elements.size(); i++) {
             Element element = elements.get(i);
-            String name = element == null || element.name() == null ? "" : element.name().toLowerCase(Locale.ROOT);
+            String name = element.name() == null ? "" : element.name().toLowerCase(Locale.ROOT);
 
             if (!name.matches("[a-z0-9]+")) {
                 throw new IllegalArgumentException("decryptor %d needs a name of letters and digits".formatted(i + 1));

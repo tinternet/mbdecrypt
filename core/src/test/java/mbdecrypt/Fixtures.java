@@ -48,9 +48,13 @@ public final class Fixtures {
 
     /** AES-CBC with PKCS#7 padding and a given IV, {@code ciphertext}. */
     public static byte[] cbc(byte[] key, byte[] iv, String plaintext) throws Exception {
+        return cbc(key, iv, plaintext.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static byte[] cbc(byte[] key, byte[] iv, byte[] plaintext) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-        return cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        return cipher.doFinal(plaintext);
     }
 
     /**

@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.HexFormat;
 import java.util.List;
@@ -31,8 +34,13 @@ class RulesTest {
     void rulesAreOptionalButNeedAllFields() {
         assertEquals(List.of(), Rules.elements(null));
         assertEquals(List.of(), Rules.elements(" "));
+        assertEquals(List.of(), Rules.elements("<!-- none yet -->"));
         assertParseError("every rule needs a pattern and a decryptor: Element[pattern=ssn, decryptor=null]",
                 "<rule pattern=\"ssn\"/>");
+        assertParseError("every rule needs a pattern and a decryptor: Element[pattern=null, decryptor=pii]",
+                "<rule decryptor=\"pii\"/>");
+        assertParseError("every rule needs a pattern and a decryptor: Element[pattern=null, decryptor=null]",
+                "<rule/>");
     }
 
     @Test
@@ -65,6 +73,7 @@ class RulesTest {
         assertDecryptorsError("Decryptors in the connection settings aren't valid XML (line 2)",
                 "<decryptor name=\"a\"/>\n<decryptor key=\"secret");
         assertDecryptorsError("decryptor 1 needs a name of letters and digits", "<decryptor name=\"my_key\"/>");
+        assertDecryptorsError("decryptor 1 needs a name of letters and digits", "<decryptor/>");
         assertDecryptorsError("decryptor 'a' needs an algorithm", "<decryptor name=\"a\" key=\"00\"/>");
         String badKey = "decryptor 'a' needs both the key and iv (if any) in hex";
         assertDecryptorsError(badKey, "<decryptor name=\"a\" algorithm=\"aes-gcm\" key=\"0g11223344\"/>");
@@ -86,6 +95,7 @@ class RulesTest {
         assertCompileError("rule for 'ssn': no decryptor named 'missing'; the decryptors are [pii, cards, fixed]",
                 "ssn", "missing");
         assertCompileError("rule for 'a.b.c.d': invalid column pattern: a.b.c.d", "a.b.c.d", "pii");
+        assertCompileError("rule for '/[/': invalid regex /[/: Unclosed character class", "/[/", "pii");
     }
 
     private static void assertCompileError(String expected, String pattern, String decryptor) {
@@ -94,11 +104,25 @@ class RulesTest {
                 () -> Rules.compile(elements, Decryptors.parse(Fixtures.DECRYPTORS))).getMessage());
     }
 
+    /** Some drivers can't say which table a column comes from. */
+    @Test
+    void columnsWithoutTableInfo() throws Exception {
+        ResultSetMetaData md = (ResultSetMetaData) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[] {ResultSetMetaData.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "getColumnLabel" -> "ssn";
+                    case "getColumnType" -> Types.VARCHAR;
+                    case "getTableName", "getSchemaName" -> throw new SQLFeatureNotSupportedException();
+                    default -> null;
+                });
+        assertEquals(column("ssn", "", "", ""), ColumnDescription.of(md, 1));
+    }
+
     @Test
     void columnMatchesNameLabelOrJoinedLabel() {
         ColumnMatcher ssn = ColumnMatcher.parse("ssn");
         assertTrue(ssn.matches(column("SSN", "SSN", "", "")));
         assertTrue(ssn.matches(column("social", "ssn", "", "")));
+        assertTrue(ssn.matches(column("ssn", "social", "", "")));
         assertTrue(ssn.matches(column("Customers - Customer__ssn", "Customers - Customer__ssn", "", "")));
         assertFalse(ssn.matches(column("ssn_2", "ssn_2", "", "")));
     }

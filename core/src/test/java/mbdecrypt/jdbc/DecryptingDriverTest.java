@@ -3,16 +3,20 @@ package mbdecrypt.jdbc;
 import static mbdecrypt.Fixtures.CARDS_KEY;
 import static mbdecrypt.Fixtures.PII_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.HexFormat;
@@ -31,7 +35,7 @@ class DecryptingDriverTest {
 
     @BeforeAll
     static void createDatabase() throws Exception {
-        Class.forName(DecryptingDriver.class.getName());
+        DriverManager.registerDriver(new DecryptingDriver());
         try (Connection c = DriverManager.getConnection("jdbc:" + H2);
                 Statement s = c.createStatement()) {
             s.execute("CREATE TABLE customers (id INT, name VARCHAR(50), ssn VARCHAR(200), card VARBINARY(200))");
@@ -98,6 +102,8 @@ class DecryptingDriverTest {
             assertEquals("nvarchar", md.getColumnTypeName(2));
             assertEquals(String.class.getName(), md.getColumnClassName(2));
             assertEquals("CARD", md.getColumnLabel(2));
+            assertEquals(2, md.getColumnCount());
+            assertFalse(md.isWrapperFor(String.class));
         }
     }
 
@@ -124,6 +130,52 @@ class DecryptingDriverTest {
             assertEquals("[can't decrypt: wrong key or algorithm, or not encrypted (value is too short to be an IV "
                     + "followed by AES-CBC ciphertext)]", rs.getString(2));
             assertEquals("[can't decrypt: the value isn't hex or Base64]", rs.getString(3));
+        }
+    }
+
+    @Test
+    void prefixedValuesThatArentTextShowWhy() throws Exception {
+        String hex = HexFormat.of().formatHex(Fixtures.cbc(PII_KEY, Fixtures.FIXED_IV, new byte[] {(byte) 0xff}));
+        try (Connection c = connect();
+                Statement s = c.createStatement();
+                ResultSet rs = s.executeQuery("SELECT '" + hex + "' AS decrypt_fixed_x")) {
+            rs.next();
+            assertEquals("[can't decrypt: the result isn't UTF-8 text; the key or algorithm is probably wrong]",
+                    rs.getString(1));
+        }
+    }
+
+    @Test
+    void emptyValuesStayEmpty() throws Exception {
+        try (Connection c = connect();
+                Statement s = c.createStatement();
+                ResultSet rs = s.executeQuery("SELECT '' AS decrypt_pii_x")) {
+            rs.next();
+            assertEquals("", rs.getString(1));
+        }
+    }
+
+    @Test
+    void driverErrorsComeThroughAsTheyAre() throws Exception {
+        try (Connection c = connect();
+                Statement s = c.createStatement();
+                ResultSet rs = s.executeQuery("SELECT ssn FROM customers")) {
+            rs.next();
+            assertThrows(SQLException.class, () -> rs.getString(0));
+            assertThrows(SQLException.class, () -> rs.getString(2));
+            assertThrows(SQLException.class, () -> rs.getMetaData().getColumnType(0));
+            assertThrows(SQLException.class, () -> rs.getMetaData().getColumnType(2));
+            assertThrows(SQLException.class, () -> s.executeQuery("SELECT nope FROM customers"));
+        }
+    }
+
+    /** Connection pools find their connections with equals, e.g. through List.remove. */
+    @Test
+    void wrappersEqualOnlyThemselves() throws Exception {
+        try (Connection a = connect();
+                Connection b = connect()) {
+            assertTrue(a.equals(a));
+            assertFalse(a.equals(b));
         }
     }
 
@@ -191,10 +243,12 @@ class DecryptingDriverTest {
         String hex = HexFormat.of().formatHex(Fixtures.gcm(PII_KEY, "hello"));
         try (Connection c = connect();
                 Statement s = c.createStatement();
-                ResultSet rs = s.executeQuery("SELECT '" + hex + "' AS a_enc, '0x" + hex.toUpperCase() + "' AS b_enc")) {
+                ResultSet rs = s.executeQuery("SELECT '" + hex + "' AS a_enc, '0x" + hex.toUpperCase() + "' AS b_enc, "
+                        + "'0X" + hex + "' AS c_enc")) {
             rs.next();
             assertEquals("hello", rs.getString(1));
             assertEquals("hello", rs.getString(2));
+            assertEquals("hello", rs.getString(3));
         }
     }
 
@@ -223,5 +277,17 @@ class DecryptingDriverTest {
         info.setProperty("decrypt-decryptors", Fixtures.DECRYPTORS);
         DriverManager.getConnection("jdbc:decrypt:" + H2, info).close();
         assertEquals(RULES, info.getProperty("decrypt-rules"));
+    }
+
+    /** Connection dialogs and pools ask drivers about themselves. */
+    @Test
+    void describesItselfAsJdbcExpects() throws Exception {
+        Driver driver = new DecryptingDriver();
+        assertFalse(driver.acceptsURL(null));
+        assertNotNull(driver.getPropertyInfo("jdbc:decrypt:" + H2, new Properties()));
+        assertTrue(driver.getMajorVersion() >= 0);
+        assertTrue(driver.getMinorVersion() >= 0);
+        assertFalse(driver.jdbcCompliant());
+        assertThrows(SQLFeatureNotSupportedException.class, driver::getParentLogger);
     }
 }

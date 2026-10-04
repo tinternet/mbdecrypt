@@ -72,9 +72,6 @@ final class DriverProxy {
         if (method.getName().equals("equals")) {
             return proxy == args[0];
         }
-        if (method.getName().equals("hashCode")) {
-            return System.identityHashCode(proxy);
-        }
         try {
             return method.invoke(target, args);
         } catch (InvocationTargetException e) {
