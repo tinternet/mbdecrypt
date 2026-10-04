@@ -14,7 +14,7 @@ driver:
   connection-properties:
     - name: decrypt-decryptors
       display-name: Decryptors
-      type: password
+      type: text
       required: true
       placeholder: <decryptor name="pii" algorithm="aes-256-gcm" key="000102…1f"/>
       helper-text: "One <decryptor name=\"pii\" algorithm=\"aes-256-gcm\" key=\"<hex>\"/> per way values are encrypted; add iv=\"<hex>\" if the IV is fixed rather than stored with each value, and padding=\"spaces\" or padding=\"zeros\" for CBC plaintext padded with spaces or zero bytes instead of PKCS#7. Names are letters and digits. Native queries decrypt a column by aliasing it decrypt_<decryptor>_<name>, e.g. SELECT ssn AS decrypt_pii_ssn."

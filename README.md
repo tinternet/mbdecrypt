@@ -38,13 +38,9 @@ encrypts:
 | `iv` | Optional. A fixed IV (or GCM nonce), in hex, when the application doesn't store one with each value |
 | `padding` | Optional, for `aes-cbc`: `pkcs7` (the default), `spaces` or `zeros`; see [Supported formats](#supported-formats) |
 
-The field is masked like a password, so it's a single line; paste the elements one after another. Key in Base64?
-`echo '<base64 key>' | base64 -d | xxd -p -c 256` prints it in hex.
+Key in Base64? `echo '<base64 key>' | base64 -d | xxd -p -c 256` prints it in hex.
 
-The keys are stored with the other connection details in Metabase's application database, so set
-`MB_ENCRYPTION_SECRET_KEY` to have Metabase encrypt them there. Like the database password, they're masked in the admin
-screens and left out of serialization exports unless you ask for secrets. A query can only use the decryptors of its own
-database.
+Set `MB_ENCRYPTION_SECRET_KEY` so Metabase encrypts the keys in its application database.
 
 Saving connects and checks the decryptors (and rules, if any), so a typo or a key of the wrong size shows up right away.
 
