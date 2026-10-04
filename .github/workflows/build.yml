@@ -25,6 +25,10 @@ jobs:
       - run: mvn -B -ntp verify
       - uses: actions/upload-artifact@v7
         with:
+          name: coverage
+          path: core/target/site/jacoco
+      - uses: actions/upload-artifact@v7
+        with:
           name: plugin
           path: metabase-sqlserver/target/sqlserver-decrypt.metabase-driver.jar
           if-no-files-found: error
