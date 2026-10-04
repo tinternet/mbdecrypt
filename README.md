@@ -3,10 +3,8 @@
 A Metabase driver for SQL Server databases with application-level encrypted columns. It decrypts values as query
 results come back, so Metabase shows plaintext.
 
-An alternative would be a pipeline (Debezium and Kafka, or a custom sync job) that copies and decrypts the data into
-another database, for example one protected with SQL Server's Always Encrypted (JDBC driver supports that).
-
-This driver is for when this extra infrastructure isn't worth the additional complexity and/or cost for your use case.
+It's an alternative to a pipeline (Debezium and Kafka, or a sync job) that copies decrypted data into another database,
+for when that extra infrastructure isn't worth it.
 
 ## Getting started
 
@@ -61,16 +59,12 @@ SELECT id, ssn AS decrypt_pii_ssn, pan AS decrypt_legacy_pan FROM customers
 Matching is case-insensitive. A `decrypt_` alias naming an unknown decryptor fails the query instead of quietly showing
 ciphertext. Other columns work as with the regular SQL Server driver.
 
-The alias also says, in the query itself, that the column is decrypted. It stays in the column name, so Metabase shows
-that column as **Decrypt Pii Ssn**. To show a nicer name:
+The prefix stays in the column name, so Metabase shows **Decrypt Pii Ssn**, and questions built on the query refer to
+the column by it. To show a nicer name, change only the displayed one:
 
 * **In one question:** click the column's gear icon and change its title.
 * **Everywhere:** turn the query into a model and set the column's display name (e.g. "SSN") in the model's metadata.
   Questions built on the model use that name, and query-builder questions on the model are decrypted too.
-
-Either way, only the displayed name changes; the column itself keeps the prefix. The driver deliberately doesn't strip
-it: questions and models built on a query refer to its columns by the names it returned, so a renamed column would
-break them.
 
 ## Writing rules
 
@@ -116,7 +110,7 @@ Encrypted with an all-zero IV? Give the decryptor `iv="0000000000000000000000000
 checked against the key. Binary columns hold the stored value as raw bytes, text columns as hex (optionally
 `0x`-prefixed) or Base64. The plaintext must be UTF-8.
 
-Need another format? Open an issue, or add a mode to [Algorithms.java](core/src/main/java/mbdecrypt/Algorithms.java).
+Need another format? Open an issue.
 
 ## Good to know
 
@@ -130,8 +124,6 @@ Need another format? Open an issue, or add a mode to [Algorithms.java](core/src/
   `decrypt_` columns. Columns picked by rules show them as stored instead (binary as `0x…` hex), because a rule can also
   match plain-text columns of the same name in other tables. Either way they're logged at debug level, without the
   value. NULL stays NULL.
-* **Aliases aren't rewritten.** Rename columns in the model or field metadata, not in the query, because Metabase uses
-  result column names when nesting questions.
 
 ## Building from source
 
@@ -141,36 +133,7 @@ Needs JDK 21+ and Maven:
 mvn verify
 ```
 
-The plugin is `metabase-sqlserver/target/sqlserver-decrypt.metabase-driver.jar`. Without a JDK, `dev/build.sh` builds
-in Docker.
-
-To release, push a tag such as `v1.2.0`. The [Build workflow](.github/workflows/build.yml) tests, builds the jar as
-version 1.2.0 and attaches it to a GitHub release.
-
-To debug inside Metabase, press F5 in VS Code (**Debug plugin in Metabase**). It builds the plugin, starts Metabase from
-`dev/compose.yml` on port 3000 and attaches the debugger.
-
-### Project layout
-
-```
-core/                 Java: algorithms, rules and the decrypting JDBC driver. No Metabase dependency.
-metabase-sqlserver/   Plugin manifest and the Clojure glue for Metabase's :sqlserver driver.
-```
-
-`:sqlserver-decrypt` is a child of Metabase's own `:sqlserver` driver. It only changes the JDBC URL from
-`jdbc:sqlserver:` to `jdbc:decrypt:sqlserver:`, which routes connections through `DecryptingDriver`. That driver wraps
-the real one and decrypts matching columns as rows are read. Since `core` is plain JDBC, it also works outside Metabase
-as `jdbc:decrypt:<any JDBC URL>`.
-
-### Adding another database
-
-1. Copy `metabase-sqlserver` to e.g. `metabase-postgres` and add it to the root `pom.xml`.
-2. In the `.clj` file, rename the namespace and file and replace `:sqlserver` with the parent driver.
-3. In `metabase-plugin.yaml`, change the names and `parent`, and replace `connection-properties` with the parent's
-   fields plus `decrypt-decryptors` and `decrypt-rules`. Plugin drivers keep their manifest in Metabase's jar at
-   `metabase/<driver>/metabase-plugin.yaml`. For drivers built into Metabase (Postgres, MySQL), drop `dependencies`.
-
-If you deploy more than one of these plugins, use the same version of each, because they share the `core` classes.
+The plugin is `metabase-sqlserver/target/sqlserver-decrypt.metabase-driver.jar`.
 
 ## License
 
